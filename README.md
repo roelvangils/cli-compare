@@ -8,90 +8,82 @@ It works in a two-stage process: first, a collection script gathers data from ea
 
 -   **Robust Version Detection**: Intelligently finds command versions by trying multiple common flags (`--version`, `-V`, `-v`).
 -   **Man Page Fallback**: If a version can't be found via flags, the script automatically searches the command's man page.
+-   **Intelligent Status Analysis**: Automatically determines if a command was `Added`, `Removed`, `Upgraded`, `Downgraded`, or remained the `Same`.
 -   **Man Page Extraction**: Saves a clean text version of every available man page for offline reading and analysis.
 -   **Flexible Comparison**: The merge script is not hardcoded and can compare any two datasets you generate.
--   **Error Handling**: Both scripts include checks to handle missing data or unexpected formats gracefully.
--   **Clear Output**: Generates a final CSV file that clearly shows which tools are present on each OS and what their versions are.
+-   **Clear Output**: Generates a final CSV file that clearly shows the status of each tool across two operating systems.
 
 ## Requirements
 
-To use this toolset, you'll need the following on your system(s):
+To use this toolset, you'll need the following:
 
 1.  **A macOS Environment**: The collection script is designed specifically for macOS.
-2.  **Zsh**: The default shell in modern macOS, so no action is needed.
-3.  **GNU Core Utilities**: The collection script uses `timeout`. The easiest way to install this is via Homebrew.
+2.  **Zsh**: The default shell in modern macOS.
+3.  **GNU Core Utilities**: The collection script uses `timeout`. Install via Homebrew:
     ```zsh
     brew install coreutils
     ```
-4.  **Python 3**: The merge script requires Python 3. macOS typically comes with Python 3 pre-installed.
+4.  **Python 3**: The merge script requires Python 3.
+5.  **Python `packaging` library**: Used for accurate version comparison. Install via pip:
+    ```zsh
+    pip3 install packaging
+    ```
 
 ## How to Use
 
 The process involves running the collection script on each macOS machine you want to analyze, and then running the merge script to produce the final comparison.
 
-### Step 1: Collect Data on the First OS
+### Step 1: Collect Data
 
-On your first machine (e.g., running `macOS Sequoia`), follow these steps:
+Run the `collect_data.sh` script on each of your target machines. The script takes one argument: a short name for the OS you are analyzing.
 
-1.  Clone this repository or download the scripts.
-2.  Open your terminal and navigate to the project directory.
-3.  Make the collection script executable:
-    ```zsh
-    chmod +x collect_data.sh
-    ```
-4.  Run the script, providing a short name for the OS you are analyzing. This name will be used for the output files.
-    ```zsh
-    # Example for macOS Sequoia
-    ./collect_data.sh sequoia
-    ```
-    This command will create:
-    -   A data file: `command_data_sequoia.tsv`
-    -   A directory with man pages: `man_pages_sequoia/`
+**On your first machine (the 'old' version):**
 
-### Step 2: Collect Data on the Second OS
+```zsh
+# Make the script executable first: chmod +x collect_data.sh
+./collect_data.sh sequoia
+```
 
-Repeat the process from Step 1 on your second machine (e.g., running `macOS Tahoe`).
+This creates `command_data_sequoia.tsv` and `man_pages_sequoia/`.
 
-1.  Run the same collection script on the second machine.
-    ```zsh
-    # Example for macOS Tahoe
-    ./collect_data.sh tahoe
-    ```
-    This command will create:
-    -   A data file: `command_data_tahoe.tsv`
-    -   A directory with man pages: `man_pages_tahoe/`
+**On your second machine (the 'new' version):**
 
-### Step 3: Merge the Results
+```zsh
+./collect_data.sh tahoe
+```
 
-Once you have the data from both systems, you can generate the final comparison report.
+This creates `command_data_tahoe.tsv` and `man_pages_tahoe/`.
 
-1.  Copy the `.tsv` file from one of the machines so that both `command_data_sequoia.tsv` and `command_data_tahoe.tsv` are in the same directory as the `merge_results.py` script.
-2.  Run the Python merge script from your terminal, providing the two OS names you used in the previous steps as command-line arguments.
+### Step 2: Merge and Analyze
+
+1.  Place both `.tsv` data files (`command_data_sequoia.tsv` and `command_data_tahoe.tsv`) in the same directory as the `merge_results.py` script.
+2.  Run the Python script from your terminal. Provide the 'old' OS name first, and the 'new' OS name second.
+
     ```zsh
     python3 merge_results.py sequoia tahoe
     ```
-3.  The script will generate the final report. You can customize the output filename:
-    ```zsh
-    python3 merge_results.py sequoia tahoe --output macos_comparison_report.csv
-    ```
+
+3.  The script will generate the final report, `command_comparison.csv`, in the new format.
 
 ## Output Explained
 
-The scripts will produce three types of output:
+The primary output is a semicolon-separated CSV file (`command_comparison.csv`) that you can easily view in a spreadsheet application.
 
-1.  **Man Page Directories (`man_pages_<os_name>/`)**: These folders contain the extracted man pages as plain text files, named like `man_php_sequoia.txt`.
+| Command Name | macOS Sequoia | macOS Tahoe | Status     |
+| :----------- | :------------ | :---------- | :--------- |
+| `php`        | 8,2           | 8,3         | Upgraded   |
+| `openssl`    | 3,0,8         | 3,0,8       | Same       |
+| `vim`        | 9,0           | N/A         | Removed    |
+| `zsh`        | 5,9           | 5,9         | Same       |
+| `nano`       | N/A           | 7,2         | Added      |
+| `gawk`       | 5,1,0         | 5,2,1       | Upgraded   |
+| `xcodebuild` | 15,0,1        | 14,3,1      | Downgraded |
 
-2.  **Intermediate Data Files (`command_data_<os_name>.tsv`)**: These are tab-separated files used by the merge script. They contain the raw data collected for a single OS.
+### Status Column Meanings
 
-3.  **Final Comparison CSV (`command_comparison.csv`)**: This is the main output file. It is a semicolon-separated file structured as follows:
-
-| Command Name | Version                  | macOS Sequoia | macOS Tahoe |
-| :----------- | :----------------------- | :-----------: | :---------: |
-| `php`        | 8.3.1                    |      Yes      |     Yes     |
-| `awk`        | 20200816 (from man page) |      Yes      |     Yes     |
-| `emacs`      | N/A                      |      No       |     Yes     |
-| `python3`    | 3.9.6                    |      Yes      |     No      |
-
-## License
-
-This project is licensed under the MIT License. See the `LICENSE` file for details.
+-   **Upgraded**: The tool exists on both systems, and the version on the newer OS is higher.
+-   **Downgraded**: The tool exists on both systems, but the version on the newer OS is lower.
+-   **Same**: The tool exists on both systems with the identical version string.
+-   **Added**: The tool is present on the newer OS but not on the older one.
+-   **Removed**: The tool was present on the older OS but has been removed from the newer one.
+-   **Changed**: The tool exists on both, but its version format is non-standard (e.g., a date or hash) and has changed.
